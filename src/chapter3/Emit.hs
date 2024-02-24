@@ -2,6 +2,9 @@
 
 module Emit where
 
+import Data.String
+import Data.ByteString.Short
+
 import LLVM.Module
 import LLVM.Context
 
@@ -19,26 +22,26 @@ import qualified Data.Map as Map
 import Codegen
 import qualified Syntax as S
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
+toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
 codegenTop :: S.Expr -> LLVM ()
 codegenTop (S.Function name args body) = do
-  define double name fnargs bls
+  define double (fromString name) fnargs bls
   where
-    fnargs = toSig args
+    fnargs = toSig (map fromString args)
     bls = createBlocks $ execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
       forM args $ \a -> do
         var <- alloca double
-        store var (local (AST.Name a))
-        assign a var
+        store var (local (AST.Name (fromString a)))
+        assign (fromString a) var
       cgen body >>= ret
 
 codegenTop (S.Extern name args) = do
-  external double name fnargs
-  where fnargs = toSig args
+  external double (fromString name) fnargs
+  where fnargs = toSig (map fromString args)
 
 codegenTop exp = do
   define double "main" [] blks
@@ -67,9 +70,9 @@ binops = Map.fromList [
 
 cgen :: S.Expr -> Codegen AST.Operand
 cgen (S.UnaryOp op a) = do
-  cgen $ S.Call ("unary" ++ op) [a]
+  cgen $ S.Call (fromString ("unary" ++ show op)) [a]
 cgen (S.BinaryOp "=" (S.Var var) val) = do
-  a <- getvar var
+  a <- getvar (fromString var)
   cval <- cgen val
   store a cval
   return cval
@@ -80,11 +83,11 @@ cgen (S.BinaryOp op a b) = do
       cb <- cgen b
       f ca cb
     Nothing -> error "No such operator"
-cgen (S.Var x) = getvar x >>= load
+cgen (S.Var x) = getvar (fromString x) >>= load
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
-  call (externf (AST.Name fn)) largs
+  call (externf (AST.Name (fromString fn))) largs
 
 -------------------------------------------------------------------------------
 -- Compilation
@@ -95,9 +98,9 @@ liftError = runExceptT >=> either fail return
 
 codegen :: AST.Module -> [S.Expr] -> IO AST.Module
 codegen mod fns = withContext $ \context ->
-  liftError $ withModuleFromAST context newast $ \m -> do
+  withModuleFromAST context newast $ \m -> do
     llstr <- moduleLLVMAssembly m
-    putStrLn llstr
+    print llstr
     return newast
   where
     modn    = mapM codegenTop fns
