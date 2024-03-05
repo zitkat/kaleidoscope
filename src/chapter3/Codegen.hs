@@ -11,10 +11,27 @@ import Data.Function
 import qualified Data.Map as Map
 
 import Control.Monad.State
+    ( MonadState, State, gets, modify, execState, StateT(StateT) )
 import Control.Applicative
 
 import LLVM.AST
+    ( Module(moduleName, moduleDefinitions),
+      Named(..),
+      Instruction(Load, FAdd, FSub, FMul, FDiv, FCmp, UIToFP, Call,
+                  Alloca, Store),
+      Terminator(Ret, Br, CondBr),
+      Name(..),
+      Operand(ConstantOperand, LocalReference),
+      Definition(GlobalDefinition),
+      Type(FloatingPointType),
+      BasicBlock(..),
+      defaultModule,
+      functionDefaults,
+      noFastMathFlags,
+      Parameter(Parameter),
+      FloatingPointType(DoubleFP) )
 import LLVM.AST.Global
+    ( Global(name, linkage, parameters, returnType, basicBlocks) )
 import qualified LLVM.AST as AST
 
 import qualified LLVM.AST.Linkage as L
@@ -118,7 +135,7 @@ createBlocks :: CodegenState -> [BasicBlock]
 createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 
 makeBlock :: (Name, BlockState) -> BasicBlock
-makeBlock (l, (BlockState _ s t)) = BasicBlock l (reverse s) (maketerm t)
+makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (maketerm t)
   where
     maketerm (Just x) = x
     maketerm Nothing = error $ "Block has no terminator: " ++ (show l)
@@ -178,7 +195,7 @@ addBlock bname = do
   nms <- gets names
 
   let new = emptyBlock ix
-      (qname, supply) = uniqueName bname nms
+  let (qname, supply) = uniqueName bname nms
 
   modify $ \s -> s { blocks = Map.insert (Name qname) new bls
                    , blockCount = ix + 1
