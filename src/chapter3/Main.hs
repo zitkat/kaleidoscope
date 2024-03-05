@@ -1,19 +1,20 @@
 module Main where
 
 import Parser
-import Codegen
-import Emit
+import Emit ( codegen )
+import Codegen ( emptyModule )
+import Data.String ( IsString(fromString) )
+import Control.Monad.Trans ( MonadIO(liftIO) )
+import qualified Control.Monad as M
 
-import Control.Monad.Trans
-
-import System.IO
-import System.Environment
+import System.Environment ( getArgs )
 import System.Console.Haskeline
+    ( defaultSettings, getInputLine, outputStrLn, runInputT )
 
 import qualified LLVM.AST as AST
 
 initModule :: AST.Module
-initModule = emptyModule (fromString "my cool jit")
+initModule = emptyModule "my cool jit"
 
 process :: AST.Module -> String -> IO (Maybe AST.Module)
 process modo source = do
@@ -45,4 +46,5 @@ main = do
   args <- getArgs
   case args of
     []      -> repl
-    [fname] -> processFile fname >> return ()
+    [fname] -> M.void (processFile fname)
+    _ -> print "Only one argument <file> can be provided."

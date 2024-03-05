@@ -33,8 +33,8 @@ newtype LLVM a = LLVM (State AST.Module a)
 runLLVM :: AST.Module -> LLVM a -> AST.Module
 runLLVM mod (LLVM m) = execState m mod
 
-emptyModule :: ShortByteString -> AST.Module
-emptyModule label = defaultModule { moduleName = label }
+emptyModule :: String -> AST.Module
+emptyModule label = defaultModule { moduleName = fromString label }
 
 addDefn :: Definition -> LLVM ()
 addDefn d = do
@@ -141,14 +141,22 @@ fresh = do
   modify $ \s -> s { count = 1 + i }
   return $ i + 1
 
-instr :: Instruction -> Codegen (Operand)
+instr :: Instruction -> Codegen Operand
 instr ins = do
   n <- fresh
-  let ref = (UnName n)
+  let ref = UnName n
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = (ref := ins) : i } )
   return $ local ref
+
+voidInstr :: Instruction -> Codegen ()
+voidInstr ins = do
+  n <- fresh
+  blk <- current
+  let i = stack blk
+  modifyBlock (blk { stack = (Do ins) : i } )
+  return ()
 
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
@@ -259,8 +267,8 @@ call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
 
-store :: Operand -> Operand -> Codegen Operand
-store ptr val = instr $ Store False ptr val Nothing 0 []
+store :: Operand -> Operand -> Codegen ()
+store ptr val = voidInstr $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []
