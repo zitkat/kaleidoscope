@@ -2,26 +2,47 @@
 
 module Emit where
 
-import Data.String
-import Data.ByteString.Short
+import Data.String ( IsString(fromString) )
+import Data.ByteString.Short ( ShortByteString )
 import qualified Data.ByteString as BS
-
-import LLVM.Module
-import LLVM.Context
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 
-import Data.Word
-import Data.Int
-import Control.Monad.Except
-import Control.Applicative
+import Control.Monad.Except ( forM )
 import qualified Data.Map as Map
 
 import Codegen
-import JIT
+    ( addBlock,
+      alloca,
+      assign,
+      call,
+      cons,
+      createBlocks,
+      define,
+      double,
+      entryBlockName,
+      execCodegen,
+      external,
+      externf,
+      fadd,
+      fcmp,
+      fdiv,
+      fmul,
+      fsub,
+      getvar,
+      load,
+      local,
+      ret,
+      runLLVM,
+      setBlock,
+      store,
+      uitofp,
+      Codegen,
+      LLVM )
+import JIT ( runJIT )
 import qualified Syntax as S
 
 toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]

@@ -1,6 +1,6 @@
 module Parser where
 
-import Text.Parsec
+import Text.Parsec ( ParseError, (<|>), many, parse, try, eof )
 import Text.Parsec.String (Parser)
 import Control.Applicative ((<$>))
 
@@ -8,17 +8,25 @@ import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
 import Lexer
+    ( commaSep,
+      float,
+      identifier,
+      integer,
+      lexer,
+      parens,
+      reserved,
+      reservedOp )
 import Syntax
+    ( Expr(Call, Float, BinaryOp, Var, Function, Extern) )
 
 int :: Parser Expr
 int = do
-  n <- integer
-  return $ Float (fromInteger n)
+  Float . fromInteger <$> integer
 
 floating :: Parser Expr
 floating = Float <$> float
 
-binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
+binary s = Ex.Infix (reservedOp s >> return (BinaryOp s))
 
 binops = [[binary "*" Ex.AssocLeft,
           binary "/" Ex.AssocLeft]
@@ -57,7 +65,7 @@ factor = try floating
       <|> try int
       <|> try call
       <|> try variable
-      <|> (parens expr)
+      <|> parens expr
 
 defn :: Parser Expr
 defn = try extern
@@ -78,7 +86,7 @@ toplevel = many $ do
     return def
 
 parseExpr :: String -> Either ParseError Expr
-parseExpr s = parse (contents expr) "<stdin>" s
+parseExpr = parse (contents expr) "<stdin>"
 
 parseToplevel :: String -> Either ParseError [Expr]
-parseToplevel s = parse (contents toplevel) "<stdin>" s
+parseToplevel = parse (contents toplevel) "<stdin>"

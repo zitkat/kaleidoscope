@@ -1,20 +1,18 @@
 module JIT where
 
-import Data.Int
-import Data.Word
 import Foreign.Ptr ( FunPtr, castFunPtr )
-import Data.String
+import Data.String ( IsString(fromString) )
 import qualified Data.ByteString as BS
 
-import Control.Monad.Except
-
-import LLVM.Target
-import LLVM.Context
-import LLVM.CodeModel
+import LLVM.Context ( withContext, Context )
 import LLVM.Module as Mod
+    ( moduleAST, moduleLLVMAssembly, withModuleFromAST )
 import qualified LLVM.AST as AST
 
 import LLVM.PassManager
+    ( defaultCuratedPassSetSpec,
+      withPassManager,
+      PassSetSpec(optLevel) )
 import LLVM.Transforms
 import LLVM.Analysis
 

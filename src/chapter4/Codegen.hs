@@ -11,10 +11,27 @@ import Data.Function
 import qualified Data.Map as Map
 
 import Control.Monad.State
+    ( MonadState, State, gets, modify, execState, StateT(StateT) )
 import Control.Applicative
 
 import LLVM.AST
+    ( Module(moduleName, moduleDefinitions),
+      Named(..),
+      Instruction(Load, FAdd, FSub, FMul, FDiv, FCmp, UIToFP, Call,
+                  Alloca, Store),
+      Terminator(Ret, Br, CondBr),
+      Name(..),
+      Operand(ConstantOperand, LocalReference),
+      Definition(GlobalDefinition),
+      Type(FloatingPointType),
+      BasicBlock(..),
+      defaultModule,
+      functionDefaults,
+      noFastMathFlags,
+      Parameter(Parameter),
+      FloatingPointType(DoubleFP) )
 import LLVM.AST.Global
+    ( Global(name, linkage, parameters, returnType, basicBlocks) )
 import qualified LLVM.AST as AST
 
 import qualified LLVM.AST.Linkage as L
