@@ -29,10 +29,12 @@ import LLVM.AST
       functionDefaults,
       noFastMathFlags,
       Parameter(Parameter),
-      FloatingPointType(DoubleFP) )
+      FloatingPointType(DoubleFP),
+      Type(FunctionType, PointerType) )
 import LLVM.AST.Global
     ( Global(name, linkage, parameters, returnType, basicBlocks) )
 import qualified LLVM.AST as AST
+import LLVM.AST.AddrSpace ( AddrSpace(AddrSpace) )
 
 import qualified LLVM.AST.Linkage as L
 import qualified LLVM.AST.Constant as C
@@ -85,6 +87,10 @@ external retty label argtys = addDefn $
 double :: Type
 double = FloatingPointType DoubleFP
 
+-- Pointer to a function for calling them
+fpointer :: Int -> Type
+fpointer n = PointerType (FunctionType double (replicate n double) False) (AddrSpace 0)
+--                                     out        args            isVarArg  zero default space
 
 -------------------------------------------------------------------------------
 -- Names
@@ -249,8 +255,8 @@ local = LocalReference double
 global ::  Name -> C.Constant
 global = C.GlobalReference double
 
-externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference double
+externf :: Int -> Name -> Operand
+externf nargs = ConstantOperand . C.GlobalReference (fpointer nargs)
 
 -- Arithmetic and Constants
 fadd :: Operand -> Operand -> Codegen Operand

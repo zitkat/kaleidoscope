@@ -103,7 +103,8 @@ cgen (S.Var x) = getvar (fromString x) >>= load
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
-  call (externf (AST.Name (fromString fn))) largs
+  let nargs = length largs in
+    call (externf nargs (AST.Name (fromString fn)) ) largs
 
 -------------------------------------------------------------------------------
 -- Compilation
