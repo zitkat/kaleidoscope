@@ -5,6 +5,10 @@ import Text.Parsec.Language (emptyDef)
 
 import qualified Text.Parsec.Token as Tok
 
+
+-- | Prepare lexer which gathers definition of the language
+-- like reserved ops and names, indentifier starting char 
+-- or comments
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
   where
@@ -15,6 +19,8 @@ lexer = Tok.makeTokenParser style
              , Tok.reservedOpNames = ops
              , Tok.reservedNames = names
              }
+
+-- Extract parsers for individual types of tokens from lexer
 
 integer :: Parser Integer
 integer = Tok.integer lexer

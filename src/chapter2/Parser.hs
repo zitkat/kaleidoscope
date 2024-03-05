@@ -11,36 +11,37 @@ import Syntax
 
 binary s f assoc = Ex.Infix (reservedOp s >> return (BinOp f)) assoc
 
-table = [[binary "*" Times Ex.AssocLeft,
+binops = [[binary "*" Times Ex.AssocLeft,
           binary "/" Divide Ex.AssocLeft]
         ,[binary "+" Plus Ex.AssocLeft,
           binary "-" Minus Ex.AssocLeft]]
 
 int :: Parser Expr
-int = do
-  n <- integer
-  return $ Float (fromInteger n)
+int = Float . fromInteger <$> integer
 
 floating :: Parser Expr
-floating = do
-  n <- float
-  return $ Float n
+floating = Float <$> float
 
 expr :: Parser Expr
-expr = Ex.buildExpressionParser table factor
+expr = Ex.buildExpressionParser binops factor
 
 variable :: Parser Expr
-variable = do
-  var <- identifier
-  return $ Var var
+variable = Var <$> identifier
 
 function :: Parser Expr
-function = do
+function =  do
   reserved "def"
   name <- identifier
   args <- parens $ many variable
-  body <- expr
-  return $ Function name args body
+  Function name args <$> expr
+
+-- originally 
+  -- do
+  -- reserved "def"
+  -- name <- identifier
+  -- args <- parens $ many variable
+  -- body <- expr
+  -- return $ Function name args body
 
 extern :: Parser Expr
 extern = do
@@ -58,11 +59,11 @@ call = do
 factor :: Parser Expr
 factor = try floating
       <|> try int
-      <|> try extern
-      <|> try function
+      <|> try extern   -- there can be external declaration inside expresion factors?
+      <|> try function -- def, there can be function definitions inside expressions?
       <|> try call
       <|> variable
-      <|> parens expr
+      <|> parens expr -- expression can be a factor but only in parens
 
 defn :: Parser Expr
 defn = try extern
@@ -71,19 +72,19 @@ defn = try extern
 
 contents :: Parser a -> Parser a
 contents p = do
-  Tok.whiteSpace lexer
-  r <- p
-  eof
-  return r
+  Tok.whiteSpace lexer -- skip white space at the start
+  r <- p               -- parse whatewer p parses
+  eof                  -- until EOF
+  return r             -- return what parsed
 
 toplevel :: Parser [Expr]
-toplevel = many $ do
-    def <- defn
-    reservedOp ";"
+toplevel = many $ do   -- on top level there are many
+    def <- defn        -- but only functions, extern functions or expressions
+    reservedOp ";"     -- an definitions end with semicolon 
     return def
 
 parseExpr :: String -> Either ParseError Expr
-parseExpr s = parse (contents expr) "<stdin>" s
+parseExpr = parse (contents expr) "<stdin>"
 
 parseToplevel :: String -> Either ParseError [Expr]
-parseToplevel s = parse (contents toplevel) "<stdin>" s
+parseToplevel = parse (contents toplevel) "<stdin>"

@@ -1,9 +1,9 @@
 module Main where
 
-import Parser
-
-import Control.Monad.Trans
+import Parser ( parseToplevel )
+import Control.Monad.Trans ( MonadIO(liftIO) )
 import System.Console.Haskeline
+    ( defaultSettings, getInputLine, outputStrLn, runInputT )
 
 process :: String -> IO ()
 process line = do
