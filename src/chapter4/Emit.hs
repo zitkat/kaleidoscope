@@ -2,6 +2,10 @@
 
 module Emit where
 
+import Data.String
+import Data.ByteString.Short
+import qualified Data.ByteString as BS
+
 import LLVM.Module
 import LLVM.Context
 
@@ -20,26 +24,26 @@ import Codegen
 import JIT
 import qualified Syntax as S
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
+toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
 codegenTop :: S.Expr -> LLVM ()
 codegenTop (S.Function name args body) = do
-  define double name fnargs bls
+  define double (fromString name) fnargs bls
   where
-    fnargs = toSig args
+    fnargs = toSig (map fromString args)
     bls = createBlocks $ execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
       forM args $ \a -> do
         var <- alloca double
-        store var (local (AST.Name a))
-        assign a var
+        store var (local (AST.Name (fromString a)))
+        assign (fromString a) var
       cgen body >>= ret
 
 codegenTop (S.Extern name args) = do
-  external double name fnargs
-  where fnargs = toSig args
+  external double (fromString name) fnargs
+  where fnargs = toSig (map fromString args)
 
 codegenTop exp = do
   define double "main" [] blks
@@ -74,11 +78,11 @@ cgen (S.BinaryOp op a b) = do
       cb <- cgen b
       f ca cb
     Nothing -> error "No such operator"
-cgen (S.Var x) = getvar x >>= load
+cgen (S.Var x) = getvar (fromString x) >>= load
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
-  call (externf (AST.Name fn)) largs
+  call (externf (AST.Name (fromString fn))) largs
 
 -------------------------------------------------------------------------------
 -- Compilation
@@ -86,10 +90,7 @@ cgen (S.Call fn args) = do
 
 codegen :: AST.Module -> [S.Expr] -> IO AST.Module
 codegen mod fns = do
-  res <- runJIT oldast
-  case res  of
-    Right newast -> return newast
-    Left err     -> putStrLn err >> return oldast
+  runJIT oldast
   where
     modn    = mapM codegenTop fns
     oldast  = runLLVM mod modn
