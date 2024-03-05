@@ -4,6 +4,7 @@ module Emit where
 
 import Data.String
 import Data.ByteString.Short
+import qualified Data.ByteString as BS
 
 import LLVM.Module
 import LLVM.Context
@@ -100,7 +101,7 @@ codegen :: AST.Module -> [S.Expr] -> IO AST.Module
 codegen mod fns = withContext $ \context ->
   withModuleFromAST context newast $ \m -> do
     llstr <- moduleLLVMAssembly m
-    print llstr
+    BS.putStr llstr
     return newast
   where
     modn    = mapM codegenTop fns
