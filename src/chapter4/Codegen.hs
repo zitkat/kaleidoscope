@@ -88,6 +88,7 @@ double :: Type
 double = FloatingPointType DoubleFP
 
 -- Pointer to a function for calling them
+-- TODO use solution from llvm-hs-kaleidoscope
 fpointer :: Int -> Type
 fpointer n = PointerType (FunctionType double (replicate n double) False) (AddrSpace 0)
 --                                     out        args            isVarArg  zero default space
