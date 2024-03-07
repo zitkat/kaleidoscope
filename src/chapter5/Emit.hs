@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Emit where
 
+import Data.String ( IsString(fromString) )
+import Data.ByteString.Short ( ShortByteString )
+import qualified Data.ByteString as BS
 import LLVM.Module
 import LLVM.Context
 
@@ -25,26 +29,26 @@ zero = cons $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
+toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
 codegenTop :: S.Expr -> LLVM ()
 codegenTop (S.Function name args body) = do
-  define double name fnargs bls
+  define double (fromString name) fnargs bls
   where
-    fnargs = toSig args
+    fnargs = toSig (map fromString args)
     bls = createBlocks $ execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
       forM args $ \a -> do
         var <- alloca double
-        store var (local (AST.Name a))
-        assign a var
+        store var (local (AST.Name (fromString a)))
+        assign (fromString a) var
       cgen body >>= ret
 
 codegenTop (S.Extern name args) = do
-  external double name fnargs
-  where fnargs = toSig args
+  external double (fromString name) fnargs
+  where fnargs = toSig (map fromString args)
 
 codegenTop exp = do
   define double "main" [] blks
@@ -79,11 +83,12 @@ cgen (S.BinaryOp op a b) = do
       cb <- cgen b
       f ca cb
     Nothing -> error "No such operator"
-cgen (S.Var x) = getvar x >>= load
+cgen (S.Var x) = getvar (fromString x) >>= load
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
-  call (externf (AST.Name fn)) largs
+  let nargs = length largs in
+    call (externf nargs (AST.Name (fromString fn))) largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -125,7 +130,7 @@ cgen (S.For ivar start cond step body) = do
   stepval <- cgen step           -- Generate loop variable step
 
   store i istart                 -- Store the loop variable initial value
-  assign ivar i                  -- Assign loop variable to the variable name
+  assign (fromString ivar) i                  -- Assign loop variable to the variable name
   br forloop                     -- Branch to the loop body block
 
   -- for.loop
@@ -151,10 +156,7 @@ cgen (S.For ivar start cond step body) = do
 
 codegen :: AST.Module -> [S.Expr] -> IO AST.Module
 codegen mod fns = do
-  res <- runJIT oldast
-  case res  of
-    Right newast -> return newast
-    Left err     -> putStrLn err >> return oldast
+  runJIT oldast
   where
     modn    = mapM codegenTop fns
     oldast  = runLLVM mod modn

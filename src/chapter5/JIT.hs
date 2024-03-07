@@ -3,7 +3,8 @@ module JIT where
 import Data.Int
 import Data.Word
 import Foreign.Ptr ( FunPtr, castFunPtr )
-
+import Data.String ( IsString(fromString) )
+import qualified Data.ByteString as BS
 import Control.Monad.Except
 
 import LLVM.Target
@@ -17,6 +18,7 @@ import LLVM.Transforms
 import LLVM.Analysis
 
 import qualified LLVM.ExecutionEngine as EE
+import LLVM.Internal.Analysis (verify)
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> (IO Double)
 
@@ -34,20 +36,21 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
 passes :: PassSetSpec
 passes = defaultCuratedPassSetSpec { optLevel = Just 3 }
 
-runJIT :: AST.Module -> IO (Either String AST.Module)
+runJIT :: AST.Module -> IO AST.Module
 runJIT mod = do
   withContext $ \context ->
-    jit context $ \executionEngine ->
-      runExceptT $ withModuleFromAST context mod $ \m ->
+    jit context $ \executionEngine -> 
+      withModuleFromAST context mod $ \m ->
         withPassManager passes $ \pm -> do
           -- Optimization Pass
-          {-runPassManager pm m-}
+          succ <- runPassManager pm m
+          verify m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
-          putStrLn s
+          BS.putStrLn s
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
-            mainfn <- EE.getFunction ee (AST.Name "main")
+            mainfn <- EE.getFunction ee (AST.Name $ fromString "main")
             case mainfn of
               Just fn -> do
                 res <- run fn
