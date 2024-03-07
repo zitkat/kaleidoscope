@@ -11,12 +11,15 @@ import qualified LLVM.AST as AST
 
 import LLVM.PassManager
     ( defaultCuratedPassSetSpec,
+      runPassManager,
       withPassManager,
       PassSetSpec(optLevel) )
+
 import LLVM.Transforms
 import LLVM.Analysis
 
 import qualified LLVM.ExecutionEngine as EE
+import LLVM.Internal.Analysis (verify)
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> (IO Double)
 
@@ -41,7 +44,8 @@ runJIT mod = do
       withModuleFromAST context mod $ \m ->
         withPassManager passes $ \pm -> do
           -- Optimization Pass
-          {-runPassManager pm m-}
+          succ <- runPassManager pm m
+          verify m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
           BS.putStrLn s
