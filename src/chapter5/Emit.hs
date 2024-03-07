@@ -105,19 +105,19 @@ cgen (S.If cond tr fl) = do
   setBlock ifthen
   trval <- cgen tr       -- Generate code for the true branch
   br ifexit              -- Branch to the merge block
-  ifthen <- getBlock
+  actifthen <- getBlock
 
   -- if.else
   ------------------
   setBlock ifelse
   flval <- cgen fl       -- Generate code for the false branch
   br ifexit              -- Branch to the merge block
-  ifelse <- getBlock
+  actifelse <- getBlock
 
   -- if.exit
   ------------------
   setBlock ifexit
-  phi double [(trval, ifthen), (flval, ifelse)]
+  phi double [(trval, actifthen), (flval, actifelse)]
 
 cgen (S.For ivar start cond step body) = do
   forloop <- addBlock "for.loop"
