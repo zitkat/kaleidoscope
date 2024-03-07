@@ -2,25 +2,49 @@
 
 module Emit where
 
-import Data.String
-import Data.ByteString.Short
+import Data.String ( IsString(fromString) )
+import Data.ByteString.Short ( ShortByteString )
 import qualified Data.ByteString as BS
 
-import LLVM.Module
-import LLVM.Context
+import LLVM.Module ( moduleLLVMAssembly, withModuleFromAST )
+import LLVM.Context ( withContext )
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 
-import Data.Word
-import Data.Int
-import Control.Monad.Except
-import Control.Applicative
+import Control.Monad.Except ( forM )
 import qualified Data.Map as Map
 
 import Codegen
+    ( Codegen,
+      LLVM,
+      runLLVM,
+      define,
+      external,
+      double,
+      createBlocks,
+      entryBlockName,
+      execCodegen,
+      addBlock,
+      setBlock,
+      assign,
+      getvar,
+      local,
+      externf,
+      fadd,
+      fsub,
+      fmul,
+      fdiv,
+      fcmp,
+      cons,
+      uitofp,
+      call,
+      alloca,
+      store,
+      load,
+      ret )
 import qualified Syntax as S
 
 toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]
@@ -93,9 +117,6 @@ cgen (S.Call fn args) = do
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
-
-liftError :: ExceptT String IO a -> IO a
-liftError = runExceptT >=> either fail return
 
 codegen :: AST.Module -> [S.Expr] -> IO AST.Module
 codegen mod fns = withContext $ \context ->
