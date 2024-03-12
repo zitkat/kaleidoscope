@@ -124,7 +124,7 @@ createBlocks :: CodegenState -> [BasicBlock]
 createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 
 makeBlock :: (Name, BlockState) -> BasicBlock
-makeBlock (l, (BlockState _ s t)) = BasicBlock l (reverse s) (maketerm t)
+makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (maketerm t)
   where
     maketerm (Just x) = x
     maketerm Nothing = error $ "Block has no terminator: " ++ (show l)
@@ -147,10 +147,10 @@ fresh = do
   modify $ \s -> s { count = 1 + i }
   return $ i + 1
 
-instr :: Instruction -> Codegen (Operand)
+instr :: Instruction -> Codegen Operand
 instr ins = do
   n <- fresh
-  let ref = (UnName n)
+  let ref = UnName n
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = (ref := ins) : i } )

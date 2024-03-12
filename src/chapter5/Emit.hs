@@ -143,7 +143,7 @@ cgen (S.For ivar start cond step body) = do
 
   cond <- cgen cond              -- Generate the loop condition
   test <- fcmp FP.ONE false cond -- Test if the loop condition is True ( 1.0 )
-  cbr test forloop forexit       -- Generate the loop condition
+  cbr test forloop forexit       -- Generate the loop jump
 
   -- for.exit
   ------------------
