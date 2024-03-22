@@ -26,7 +26,7 @@ import LLVM.Internal.Analysis (verify)
 import GHC.Generics (Generic1(from1))
 import LLVM.Internal.ExecutionEngine (ExecutableModule, ExecutionEngine)
 
-foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> (IO Double)
+foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> IO Double
 
 run :: FunPtr a -> IO Double
 run fn = haskFun (castFunPtr fn :: FunPtr (IO Double))
@@ -79,7 +79,7 @@ genFName name i = name ++ "." ++ show i
 
 gatherFunctions :: (ExecutionEngine e f) => ExecutableModule e -> String -> IO [f]
 gatherFunctions ee name = gatherFunctions' 1 []
-  where 
+  where
     -- gF :: Int -> IO (Maybe f)
     gF i = EE.getFunction ee (fromString (genFName name i))
     -- gFs :: IO [f]

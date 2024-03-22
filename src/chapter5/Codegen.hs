@@ -220,7 +220,7 @@ current = do
 assign :: ShortByteString -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
-  modify $ \s -> s { symtab = [(var, x)] ++ lcls }
+  modify $ \s -> s { symtab = (var, x) : lcls }
 
 getvar :: ShortByteString -> Codegen Operand
 getvar var = do
