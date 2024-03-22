@@ -7,11 +7,11 @@ preprocessor
 *.ll
 *.bc
 *.s
+*.exe
 *.o
+*.out
 *.so
 *.pdf
 .stack-work
 dist-newstyle
 stack.yaml.lock
-chapter6
-chapter7
