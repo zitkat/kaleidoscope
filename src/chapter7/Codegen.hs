@@ -16,6 +16,7 @@ module Codegen where
 
 import Data.Word
 import Data.String
+import Data.ByteString.Short
 import Data.List
 import Data.Function
 import qualified Data.Map as Map
@@ -24,6 +25,7 @@ import Control.Monad.State
 import Control.Applicative
 
 import LLVM.AST
+import LLVM.AST.AddrSpace ( AddrSpace(AddrSpace) )
 import LLVM.AST.Global
 import qualified LLVM.AST as AST
 
@@ -44,14 +46,14 @@ runLLVM :: AST.Module -> LLVM a -> AST.Module
 runLLVM mod (LLVM m) = execState m mod
 
 emptyModule :: String -> AST.Module
-emptyModule label = defaultModule { moduleName = label }
+emptyModule label = defaultModule { moduleName = fromString label }
 
 addDefn :: Definition -> LLVM ()
 addDefn d = do
   defs <- gets moduleDefinitions
   modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
-define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+define ::  Type -> ShortByteString -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
@@ -60,7 +62,7 @@ define retty label argtys body = addDefn $
   , basicBlocks = body
   }
 
-external ::  Type -> String -> [(Type, Name)] -> LLVM ()
+external ::  Type -> ShortByteString -> [(Type, Name)] -> LLVM ()
 external retty label argtys = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
@@ -76,25 +78,31 @@ external retty label argtys = addDefn $
 
 -- IEEE 754 double
 double :: Type
-double = FloatingPointType FP_Double
+double = FloatingPointType DoubleFP
+
+-- Pointer to a function for calling them
+-- TODO use solution from llvm-hs-kaleidoscope
+fpointer :: Int -> Type
+fpointer n = PointerType (FunctionType double (replicate n double) False) (AddrSpace 0)
+--                                     out        args            isVarArg  zero default space
 
 -------------------------------------------------------------------------------
 -- Names
 -------------------------------------------------------------------------------
 
-type Names = Map.Map String Int
+type Names = Map.Map ShortByteString Int
 
-uniqueName :: String -> Names -> (String, Names)
+uniqueName :: ShortByteString -> Names -> (ShortByteString, Names)
 uniqueName nm ns =
   case Map.lookup nm ns of
     Nothing -> (nm,  Map.insert nm 1 ns)
-    Just ix -> (nm ++ show ix, Map.insert nm (ix+1) ns)
+    Just ix -> (nm <> fromString (show ix), Map.insert nm (ix+1) ns)
 
 -------------------------------------------------------------------------------
 -- Codegen State
 -------------------------------------------------------------------------------
 
-type SymbolTable = [(String, Operand)]
+type SymbolTable = [(ShortByteString, Operand)]
 
 data CodegenState
   = CodegenState {
@@ -127,12 +135,12 @@ createBlocks :: CodegenState -> [BasicBlock]
 createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 
 makeBlock :: (Name, BlockState) -> BasicBlock
-makeBlock (l, (BlockState _ s t)) = BasicBlock l (reverse s) (maketerm t)
+makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (maketerm t)
   where
     maketerm (Just x) = x
     maketerm Nothing = error $ "Block has no terminator: " ++ (show l)
 
-entryBlockName :: String
+entryBlockName :: ShortByteString
 entryBlockName = "entry"
 
 emptyBlock :: Int -> BlockState
@@ -141,7 +149,7 @@ emptyBlock i = BlockState i [] Nothing
 emptyCodegen :: CodegenState
 emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty
 
-execCodegen :: [(String, Operand)] -> Codegen a -> CodegenState
+execCodegen :: [(ShortByteString, Operand)] -> Codegen a -> CodegenState
 execCodegen vars m = execState (runCodegen m) emptyCodegen { symtab = vars }
 
 fresh :: Codegen Word
@@ -150,22 +158,22 @@ fresh = do
   modify $ \s -> s { count = 1 + i }
   return $ i + 1
 
-current :: Codegen BlockState
-current = do
-  c <- gets currentBlock
-  blks <- gets blocks
-  case Map.lookup c blks of
-    Just x -> return x
-    Nothing -> error $ "No such block: " ++ show c
-
-instr :: Instruction -> Codegen (Operand)
+instr :: Instruction -> Codegen Operand
 instr ins = do
   n <- fresh
-  let ref = (UnName n)
+  let ref = UnName n
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = (ref := ins) : i } )
   return $ local ref
+
+voidInstr :: Instruction -> Codegen ()
+voidInstr ins = do
+  n <- fresh
+  blk <- current
+  let i = stack blk
+  modifyBlock (blk { stack = (Do ins) : i } )
+  return ()
 
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
@@ -176,7 +184,7 @@ terminator trm = do
 named :: String -> Codegen a -> Codegen Operand
 named iname m = m >> do
   blk <- current
-  let b = Name iname
+  let b = Name (fromString iname)
       (_ := x) = last (stack blk)
   modifyBlock $ blk { stack = init (stack blk) ++ [b := x] }
   return $ local b
@@ -188,7 +196,7 @@ named iname m = m >> do
 entry :: Codegen Name
 entry = gets currentBlock
 
-addBlock :: String -> Codegen Name
+addBlock :: ShortByteString -> Codegen Name
 addBlock bname = do
   bls <- gets blocks
   ix  <- gets blockCount
@@ -216,16 +224,24 @@ modifyBlock new = do
   active <- gets currentBlock
   modify $ \s -> s { blocks = Map.insert active new (blocks s) }
 
+current :: Codegen BlockState
+current = do
+  c <- gets currentBlock
+  blks <- gets blocks
+  case Map.lookup c blks of
+    Just x -> return x
+    Nothing -> error $ "No such block: " ++ show c
+
 -------------------------------------------------------------------------------
 -- Symbol Table
 -------------------------------------------------------------------------------
 
-assign :: String -> Operand -> Codegen ()
+assign :: ShortByteString -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
   modify $ \s -> s { symtab = [(var, x)] ++ lcls }
 
-getvar :: String -> Codegen Operand
+getvar :: ShortByteString -> Codegen Operand
 getvar var = do
   syms <- gets symtab
   case lookup var syms of
@@ -241,8 +257,8 @@ local = LocalReference double
 global ::  Name -> C.Constant
 global = C.GlobalReference double
 
-externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference double
+externf :: Int -> Name -> Operand
+externf nargs = ConstantOperand . C.GlobalReference (fpointer nargs)
 
 -- Arithmetic and Constants
 fadd :: Operand -> Operand -> Codegen Operand
@@ -276,8 +292,8 @@ call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
 
-store :: Operand -> Operand -> Codegen Operand
-store ptr val = instr $ Store False ptr val Nothing 0 []
+store :: Operand -> Operand -> Codegen ()
+store ptr val = voidInstr $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []

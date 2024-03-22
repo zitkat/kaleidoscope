@@ -10,9 +10,13 @@
 --------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Emit where
 
+import Data.String ( IsString(fromString) )
+import Data.ByteString.Short ( ShortByteString )
+import qualified Data.ByteString as BS
 import LLVM.Module
 import LLVM.Context
 import LLVM.Analysis
@@ -40,26 +44,27 @@ zero = cons $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
+toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (double, AST.Name x))
 
 codegenTop :: S.Expr -> LLVM ()
 codegenTop (S.Function name args body) = do
-  define double name largs bls
+  define double (fromString name) fnargs bls
   where
-    largs = map (\x -> (double, AST.Name x)) args
+    fnargs = toSig (map fromString args)
+    largs = map (\x -> (double, AST.Name (fromString x))) args
     bls = createBlocks $ execCodegen [] $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      forM args $ \a -> do
+      forM_ args $ \a -> do
         var <- alloca double
-        store var (local (AST.Name a))
-        assign a var
+        store var (local (AST.Name (fromString a)))
+        assign (fromString a) var
       cgen body >>= ret
 
 codegenTop (S.Extern name args) = do
-  external double name fnargs
-  where fnargs = toSig args
+  external double (fromString name) fnargs
+  where fnargs = toSig (map fromString args)
 
 codegenTop (S.BinaryDef name args body) =
   codegenTop $ S.Function ("binary" ++ name) args body
@@ -68,9 +73,9 @@ codegenTop (S.UnaryDef name args body) =
   codegenTop $ S.Function ("unary" ++ name) args body
 
 codegenTop exp = do
-  define double "main" [] bls
+  define double "main" [] blks
   where
-    bls = createBlocks $ execCodegen [] $ do
+    blks = createBlocks $ execCodegen [] $ do
       entry <- addBlock entryBlockName
       setBlock entry
       cgen exp >>= ret
@@ -95,14 +100,14 @@ binops = Map.fromList [
 cgen :: S.Expr -> Codegen AST.Operand
 cgen (S.UnaryOp op a) = do
   cgen $ S.Call ("unary" ++ op) [a]
-cgen (S.Let a b c) = do
+cgen (S.Let name val body) = do
   i <- alloca double
-  val <- cgen b
+  val <- cgen val
   store i val
-  assign a i
-  cgen c
+  assign (fromString name) i  -- define variable `name`
+  cgen body                   -- execute body of the let statement in context with variable `name` defined, possibly recursing into another let
 cgen (S.BinaryOp "=" (S.Var var) val) = do
-  a <- getvar var
+  a <- getvar (fromString var)
   cval <- cgen val
   store a cval
   return cval
@@ -112,13 +117,14 @@ cgen (S.BinaryOp op a b) = do
       ca <- cgen a
       cb <- cgen b
       f ca cb
-    Nothing -> cgen (S.Call ("binary" ++ op) [a,b])
-cgen (S.Var x) = getvar x >>= load
+    Nothing -> error ("No such operator " ++ show op)
+cgen (S.Var x) = getvar (fromString x) >>= load
 cgen (S.Int n) = return $ cons $ C.Float (F.Double (fromIntegral n))
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
-  call (externf (AST.Name fn)) largs
+  let nargs = length largs in
+    call (externf nargs (AST.Name (fromString fn))) largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -135,19 +141,19 @@ cgen (S.If cond tr fl) = do
   setBlock ifthen
   trval <- cgen tr       -- Generate code for the true branch
   br ifexit              -- Branch to the merge block
-  ifthen <- getBlock
+  actifthen <- getBlock
 
   -- if.else
   ------------------
   setBlock ifelse
   flval <- cgen fl       -- Generate code for the false branch
   br ifexit              -- Branch to the merge block
-  ifelse <- getBlock
+  actifelse <- getBlock
 
   -- if.exit
   ------------------
   setBlock ifexit
-  phi double [(trval, ifthen), (flval, ifelse)]
+  phi double [(trval, actifthen), (flval, actifelse)]
 
 cgen (S.For ivar start cond step body) = do
   forloop <- addBlock "for.loop"
@@ -160,7 +166,7 @@ cgen (S.For ivar start cond step body) = do
   stepval <- cgen step           -- Generate loop variable step
 
   store i istart                 -- Store the loop variable initial value
-  assign ivar i                  -- Assign loop variable to the variable name
+  assign (fromString ivar) i                  -- Assign loop variable to the variable name
   br forloop                     -- Branch to the loop body block
 
   -- for.loop
@@ -173,7 +179,7 @@ cgen (S.For ivar start cond step body) = do
 
   cond <- cgen cond              -- Generate the loop condition
   test <- fcmp FP.ONE false cond -- Test if the loop condition is True ( 1.0 )
-  cbr test forloop forexit       -- Generate the loop condition
+  cbr test forloop forexit       -- Generate the loop jump
 
   -- for.exit
   ------------------
