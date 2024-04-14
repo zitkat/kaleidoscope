@@ -11,7 +11,7 @@ import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 
-import Control.Monad.Except ( forM )
+import Control.Monad.Except ( forM_ )
 import qualified Data.Map as Map
 
 import Codegen
@@ -56,7 +56,7 @@ codegenTop (S.Function name args body) = do
     bls = createBlocks $ execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      forM args $ \a -> do
+      forM_ args $ \a -> do
         var <- alloca double
         store var (local (AST.Name (fromString a)))
         assign (fromString a) var

@@ -1,6 +1,6 @@
 module Parser where
 
-import Text.Parsec
+import Text.Parsec ( ParseError, (<|>), many, parse, try, eof )
 import Text.Parsec.String (Parser)
 import Control.Applicative ((<$>))
 
@@ -8,12 +8,20 @@ import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
 import Lexer
+    ( commaSep,
+      float,
+      identifier,
+      integer,
+      lexer,
+      parens,
+      reserved,
+      reservedOp )
 import Syntax
+    ( Expr(For, Float, BinaryOp, Var, Function, Extern, Call, If) )
 
 int :: Parser Expr
 int = do
-  n <- integer
-  return $ Float (fromInteger n)
+  Float . fromInteger <$> integer
 
 floating :: Parser Expr
 floating = Float <$> float

@@ -3,11 +3,10 @@
 
 module Codegen where
 
-import Data.Word
-import Data.String
-import Data.ByteString.Short
-import Data.List
-import Data.Function
+import Data.String ( IsString(fromString) )
+import Data.ByteString.Short ( ShortByteString )
+import Data.List ( sortBy )
+import Data.Function ( on )
 import qualified Data.Map as Map
 
 import Control.Monad.State

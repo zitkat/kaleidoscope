@@ -15,8 +15,7 @@ import LLVM.PassManager
       withPassManager,
       PassSetSpec(optLevel) )
 
-import LLVM.Transforms
-import LLVM.Analysis
+import LLVM.Analysis ( verify )
 
 import qualified LLVM.ExecutionEngine as EE
 import LLVM.Internal.Analysis (verify)

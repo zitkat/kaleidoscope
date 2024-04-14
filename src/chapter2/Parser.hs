@@ -1,13 +1,21 @@
 module Parser where
 
-import Text.Parsec
+import Text.Parsec ( ParseError, (<|>), many, parse, try, eof )
 import Text.Parsec.String (Parser)
 
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
 import Lexer
-import Syntax
+    ( commaSep,
+      float,
+      identifier,
+      integer,
+      lexer,
+      parens,
+      reserved,
+      reservedOp )
+import Syntax ( Expr(..), Op(Minus, Times, Divide, Plus) )
 
 binary s f assoc = Ex.Infix (reservedOp s >> return (BinOp f)) assoc
 

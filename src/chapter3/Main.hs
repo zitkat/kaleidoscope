@@ -1,6 +1,6 @@
 module Main where
 
-import Parser
+import Parser ( parseToplevel )
 import Emit ( codegen )
 import Codegen ( emptyModule )
 import Data.String ( IsString(fromString) )

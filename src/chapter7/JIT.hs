@@ -12,24 +12,21 @@
 
 module JIT where
 
-import Data.Int
-import Data.Word
 import Foreign.Ptr ( FunPtr, castFunPtr )
 import Data.String ( IsString(fromString) )
-import Data.Maybe
 import qualified Data.ByteString.Char8 as BS
-import Control.Monad.Except
-import Control.Applicative
 
-import LLVM.Target
-import LLVM.Context
-import LLVM.CodeModel
+import Control.Applicative ( Alternative((<|>)) )
+
+import LLVM.Context ( Context, withContext )
 import LLVM.Module as Mod
+    ( moduleAST, moduleLLVMAssembly, withModuleFromAST )
 import qualified LLVM.AST as AST
 
 import LLVM.PassManager
-import LLVM.Transforms
-import LLVM.Analysis
+    ( PassSetSpec(optLevel),
+      defaultCuratedPassSetSpec,
+      withPassManager )
 
 import qualified LLVM.ExecutionEngine as EE
 import LLVM.Internal.Analysis (verify)

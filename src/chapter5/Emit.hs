@@ -6,18 +6,14 @@ module Emit where
 import Data.String ( IsString(fromString) )
 import Data.ByteString.Short ( ShortByteString )
 import qualified Data.ByteString as BS
-import LLVM.Module
-import LLVM.Context
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 
-import Data.Word
-import Data.Int
-import Control.Monad.Except
-import Control.Applicative
+import Control.Monad.Except ( forM_ )
+import Control.Applicative ()
 import qualified Data.Map as Map
 
 import Codegen
@@ -40,9 +36,9 @@ codegenTop (S.Function name args body) = do
     bls = createBlocks $ execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      forM args $ \a -> do
+      forM_ args $ \a -> do
         var <- alloca double
-        store var (local (AST.Name (fromString a)))
+        store var (local (fromString a))
         assign (fromString a) var
       cgen body >>= ret
 

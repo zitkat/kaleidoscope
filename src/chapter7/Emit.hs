@@ -17,10 +17,6 @@ module Emit where
 import Data.String ( IsString(fromString) )
 import Data.ByteString.Short ( ShortByteString )
 import qualified Data.ByteString as BS
-import LLVM.Module
-import LLVM.Context
-import LLVM.Analysis
-import LLVM.PassManager
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
@@ -124,7 +120,7 @@ cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
   let nargs = length largs in
-    call (externf nargs (AST.Name (fromString fn))) largs
+    call (externf nargs (fromString fn)) largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"

@@ -1,14 +1,14 @@
 module Main where
 
-import Parser
-import Codegen
-import Emit
+import Parser ( parseToplevel )
+import Codegen ( emptyModule )
+import Emit ( codegen )
 
-import Control.Monad.Trans
+import Control.Monad.Trans ( MonadIO(liftIO) )
 
-import System.IO
-import System.Environment
+import System.Environment ( getArgs )
 import System.Console.Haskeline
+    ( defaultSettings, getInputLine, outputStrLn, runInputT )
 
 import qualified LLVM.AST as AST
 
@@ -45,4 +45,4 @@ main = do
   args <- getArgs
   case args of
     []      -> repl
-    [fname] -> processFile fname >> return ()
+    (fname:_) -> processFile fname >> return ()

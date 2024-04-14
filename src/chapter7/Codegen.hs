@@ -14,19 +14,37 @@
 
 module Codegen where
 
-import Data.Word
-import Data.String
-import Data.ByteString.Short
-import Data.List
-import Data.Function
+import Data.String ( IsString(fromString) )
+import Data.ByteString.Short ( ShortByteString )
+import Data.List ( sortBy )
+import Data.Function ( on )
 import qualified Data.Map as Map
 
 import Control.Monad.State
-import Control.Applicative
+    ( MonadState, StateT(StateT), gets, modify, execState, State )
 
 import LLVM.AST
+    ( Module(moduleName, moduleDefinitions),
+      Name(..),
+      defaultModule,
+      functionDefaults,
+      noFastMathFlags,
+      Definition(GlobalDefinition),
+      BasicBlock(..),
+      Parameter(Parameter),
+      Instruction(Phi, FAdd, FSub, FMul, FDiv, FCmp, UIToFP, Call,
+                  Alloca, Store, Load),
+      Named(..),
+      Terminator(Ret, Br, CondBr),
+      Operand(ConstantOperand, LocalReference),
+      FloatingPointType(DoubleFP),
+      Type(FunctionType, FloatingPointType, PointerType) )
 import LLVM.AST.AddrSpace ( AddrSpace(AddrSpace) )
 import LLVM.AST.Global
+    ( functionDefaults,
+      BasicBlock(..),
+      Global(name, linkage, parameters, returnType, basicBlocks),
+      Parameter(Parameter) )
 import qualified LLVM.AST as AST
 
 import qualified LLVM.AST.Linkage as L

@@ -11,7 +11,7 @@
 
 module Parser where
 
-import Text.Parsec
+import Text.Parsec ( ParseError, (<|>), many, parse, try, eof )
 import Text.Parsec.String (Parser)
 import Control.Applicative ((<$>))
 
@@ -19,7 +19,17 @@ import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
 import Lexer
-import Syntax
+    ( commaSep,
+      float,
+      identifier,
+      integer,
+      lexer,
+      operator,
+      parens,
+      reserved,
+      reservedOp,
+      whitespace )
+import Syntax ( Expr(..) )
 
 int :: Parser Expr
 int = Int <$> integer

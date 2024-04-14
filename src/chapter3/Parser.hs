@@ -1,13 +1,22 @@
 module Parser where
 
-import Text.Parsec
+import Text.Parsec ( ParseError, (<|>), many, parse, try, eof )
 import Text.Parsec.String (Parser)
 
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
 import Lexer
+    ( commaSep,
+      float,
+      identifier,
+      integer,
+      lexer,
+      parens,
+      reserved,
+      reservedOp )
 import Syntax
+    ( Expr(Call, Float, BinaryOp, Var, Function, Extern) )
 
 int :: Parser Expr
 int = Float . fromInteger <$> integer
