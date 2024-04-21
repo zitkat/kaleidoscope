@@ -5,8 +5,11 @@
 
 module Codegen
   ( Codegen,
+    runCodegen,
     evalCodegen,
     codegenModule,
+    CodegenState,
+    emptyCodegen
   )
 where
 
@@ -42,6 +45,9 @@ data CodegenState
 
 evalCodegen :: Codegen a -> IO a
 evalCodegen = flip evalStateT emptyCodegen
+
+runCodegen :: StateT CodegenState m a -> CodegenState -> m (a, CodegenState)
+runCodegen = runStateT
 
 emptyCodegen :: CodegenState
 emptyCodegen = CodegenState
