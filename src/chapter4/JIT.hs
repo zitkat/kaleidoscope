@@ -2,7 +2,7 @@ module JIT where
 
 import Foreign.Ptr ( FunPtr, castFunPtr )
 import Data.String ( IsString(fromString) )
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as CS
 
 import LLVM.Context ( withContext, Context )
 import LLVM.Module as Mod
@@ -47,7 +47,7 @@ runJIT mod = do
           verify m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
-          BS.putStrLn s
+          CS.putStrLn s
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
             mainfn <- EE.getFunction ee (AST.Name $ fromString "main")
