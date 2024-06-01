@@ -1,6 +1,6 @@
 module Syntax where
 
-type Name = String
+import LLVM.AST (Name)
 
 data Expr
   = Int Integer

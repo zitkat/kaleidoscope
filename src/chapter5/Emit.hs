@@ -6,45 +6,50 @@ module Emit where
 import Data.String ( IsString(fromString) )
 import Data.ByteString.Short ( ShortByteString )
 import qualified Data.ByteString as BS
+import LLVM.Module
+import LLVM.Context
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 
-import Control.Monad.Except ( forM_ )
-import Control.Applicative ()
+import Data.Word
+import Data.Int
+import Control.Monad.Except
+import Control.Applicative
 import qualified Data.Map as Map
 
 import Codegen
 import JIT
 import qualified Syntax as S
+import LLVM.AST (Name)
 
 one = cons $ C.Float (F.Double 1.0)
 zero = cons $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
-toSig :: [ShortByteString] -> [(AST.Type, AST.Name)]
-toSig = map (\x -> (double, AST.Name x))
+toSig :: [AST.Name] -> [(AST.Type, AST.Name)]
+toSig = map (\x -> (double, x))
 
 codegenTop :: S.Expr -> LLVM ()
 codegenTop (S.Function name args body) = do
-  define double (fromString name) fnargs bls
+  define double name fnargs bls
   where
-    fnargs = toSig (map fromString args)
+    fnargs = toSig args
     bls = createBlocks $ execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      forM_ args $ \a -> do
+      forM args $ \a -> do
         var <- alloca double
-        store var (local (fromString a))
-        assign (fromString a) var
+        store var (local  a)
+        assign a var
       cgen body >>= ret
 
 codegenTop (S.Extern name args) = do
-  external double (fromString name) fnargs
-  where fnargs = toSig (map fromString args)
+  external double name fnargs
+  where fnargs = toSig args
 
 codegenTop exp = do
   define double "main" [] blks
@@ -83,8 +88,8 @@ cgen (S.Var x) = getvar (fromString x) >>= load
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
 cgen (S.Call fn args) = do
   largs <- mapM cgen args
-  let nargs = length largs in
-    call (externf nargs (AST.Name (fromString fn))) largs
+  f <- getfun fn (replicate (Prelude.length largs) double)
+  call f largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -126,7 +131,7 @@ cgen (S.For ivar start cond step body) = do
   stepval <- cgen step           -- Generate loop variable step
 
   store i istart                 -- Store the loop variable initial value
-  assign (fromString ivar) i                  -- Assign loop variable to the variable name
+  assign ivar i                  -- Assign loop variable to the variable name
   br forloop                     -- Branch to the loop body block
 
   -- for.loop

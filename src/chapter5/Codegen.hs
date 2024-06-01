@@ -3,37 +3,21 @@
 
 module Codegen where
 
+import Data.Word
 import Data.String ( IsString(fromString) )
-import Data.ByteString.Short ( ShortByteString )
-import Data.List ( sortBy )
-import Data.Function ( on )
+import qualified Data.ByteString.Char8 as BS
+import Data.ByteString.Short
+    ( ShortByteString, fromShort, toShort )
+import Data.List
+import Data.Function
 import qualified Data.Map as Map
 
 import Control.Monad.State
-    ( MonadState, StateT(StateT), gets, modify, execState, State )
+import Control.Applicative
 
 import LLVM.AST
-    ( Module(moduleName, moduleDefinitions),
-      Name(..),
-      defaultModule,
-      functionDefaults,
-      noFastMathFlags,
-      Definition(GlobalDefinition),
-      BasicBlock(..),
-      Parameter(Parameter),
-      Instruction(Phi, FAdd, FSub, FMul, FDiv, FCmp, UIToFP, Call,
-                  Alloca, Store, Load),
-      Named(..),
-      Terminator(Ret, Br, CondBr),
-      Operand(ConstantOperand, LocalReference),
-      FloatingPointType(DoubleFP),
-      Type(FunctionType, FloatingPointType, PointerType) )
 import LLVM.AST.AddrSpace ( AddrSpace(AddrSpace) )
 import LLVM.AST.Global
-    ( functionDefaults,
-      BasicBlock(..),
-      Global(name, linkage, parameters, returnType, basicBlocks),
-      Parameter(Parameter) )
 import qualified LLVM.AST as AST
 
 import qualified LLVM.AST.Linkage as L
@@ -60,25 +44,32 @@ addDefn d = do
   defs <- gets moduleDefinitions
   modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
-define ::  Type -> ShortByteString -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+define ::  Type -> Name -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
-    name        = Name label
+    name        = label
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
   , returnType  = retty
   , basicBlocks = body
   }
 
-external ::  Type -> ShortByteString -> [(Type, Name)] -> LLVM ()
+external ::  Type -> Name -> [(Type, Name)] -> LLVM ()
 external retty label argtys = addDefn $
   GlobalDefinition $ functionDefaults {
-    name        = Name label
+    name        = label
   , linkage     = L.External
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
   , returnType  = retty
   , basicBlocks = []
   }
 
+
+getfun :: Name -> [AST.Type] -> Codegen AST.Operand
+getfun name tys = do 
+  smtb <- gets symtab
+  case Map.lookup name (Map.fromList smtb) of
+    Just x -> pure x
+    Nothing -> pure (AST.ConstantOperand (C.GlobalReference (fpointer (length tys)) name))
 ---------------------------------------------------------------------------------
 -- Types
 -------------------------------------------------------------------------------
@@ -97,19 +88,36 @@ fpointer n = PointerType (FunctionType double (replicate n double) False) (AddrS
 -- Names
 -------------------------------------------------------------------------------
 
-type Names = Map.Map ShortByteString Int
+type Names = Map.Map Name Int
 
-uniqueName :: ShortByteString -> Names -> (ShortByteString, Names)
+uniqueName :: Name -> Names -> (Name, Names)
 uniqueName nm ns =
   case Map.lookup nm ns of
     Nothing -> (nm,  Map.insert nm 1 ns)
-    Just ix -> (nm <> fromString (show ix), Map.insert nm (ix+1) ns)
+    Just ix -> (sufixName (show ix) nm, Map.insert nm (ix+1) ns)
+
+prefixName :: String -> Name -> Name
+prefixName pre (AST.Name nm) = AST.mkName (pre <> unpackBS nm)
+prefixName pre (AST.UnName nm) = AST.mkName (pre <> show nm)
+
+sufixName :: String -> Name -> Name
+sufixName su (AST.Name nm) = AST.mkName ( unpackBS nm <> su)
+sufixName su (AST.UnName nm) = AST.mkName ( show nm <> su)
+
+unpackBS :: ShortByteString -> String
+unpackBS x = BS.unpack (fromShort x)
+
+packShort :: String -> ShortByteString
+packShort = toShort . BS.pack
+
+unpackName :: AST.Name -> ShortByteString
+unpackName (AST.Name nm) = nm
 
 -------------------------------------------------------------------------------
 -- Codegen State
 -------------------------------------------------------------------------------
 
-type SymbolTable = [(ShortByteString, Operand)]
+type SymbolTable = [(Name, Operand)]
 
 data CodegenState
   = CodegenState {
@@ -147,14 +155,14 @@ makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (maketerm t)
     maketerm (Just x) = x
     maketerm Nothing = error $ "Block has no terminator: " ++ (show l)
 
-entryBlockName :: ShortByteString
+entryBlockName :: Name
 entryBlockName = "entry"
 
 emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty
+emptyCodegen = CodegenState entryBlockName Map.empty [] 1 0 Map.empty
 
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
@@ -195,7 +203,7 @@ terminator trm = do
 entry :: Codegen Name
 entry = gets currentBlock
 
-addBlock :: ShortByteString -> Codegen Name
+addBlock :: Name -> Codegen Name
 addBlock bname = do
   bls <- gets blocks
   ix  <- gets blockCount
@@ -204,11 +212,11 @@ addBlock bname = do
   let new = emptyBlock ix
       (qname, supply) = uniqueName bname nms
 
-  modify $ \s -> s { blocks = Map.insert (Name qname) new bls
+  modify $ \s -> s { blocks = Map.insert qname new bls
                    , blockCount = ix + 1
                    , names = supply
                    }
-  return (Name qname)
+  return qname
 
 setBlock :: Name -> Codegen Name
 setBlock bname = do
@@ -235,12 +243,12 @@ current = do
 -- Symbol Table
 -------------------------------------------------------------------------------
 
-assign :: ShortByteString -> Operand -> Codegen ()
+assign :: Name -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
   modify $ \s -> s { symtab = (var, x) : lcls }
 
-getvar :: ShortByteString -> Codegen Operand
+getvar :: Name -> Codegen Operand
 getvar var = do
   syms <- gets symtab
   case lookup var syms of

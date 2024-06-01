@@ -1,38 +1,36 @@
 module Parser where
 
-import Text.Parsec ( ParseError, (<|>), many, parse, try, eof )
+import Text.Parsec
 import Text.Parsec.String (Parser)
 import Control.Applicative ((<$>))
 
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
+import LLVM.AST.Name (Name, mkName)
+
 import Lexer
-    ( commaSep,
-      float,
-      identifier,
-      integer,
-      lexer,
-      parens,
-      reserved,
-      reservedOp )
 import Syntax
     ( Expr(For, Float, BinaryOp, Var, Function, Extern, Call, If) )
 
 int :: Parser Expr
 int = do
-  Float . fromInteger <$> integer
+  n <- integer
+  return $ Float (fromInteger n)
 
 floating :: Parser Expr
 floating = Float <$> float
 
-binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
+binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp (mkName s))) assoc
 
 binops = [[binary "*" Ex.AssocLeft,
           binary "/" Ex.AssocLeft]
         ,[binary "+" Ex.AssocLeft,
           binary "-" Ex.AssocLeft]
         ,[binary "<" Ex.AssocLeft]]
+
+name :: Parser Name
+name = mkName <$> identifier
 
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser binops factor
@@ -43,23 +41,23 @@ variable = Var <$> identifier
 function :: Parser Expr
 function = do
   reserved "def"
-  name <- identifier
-  args <- parens $ many identifier
+  nm <- name
+  args <- parens $ many name
   body <- expr
-  return $ Function name args body
+  return $ Function nm args body
 
 extern :: Parser Expr
 extern = do
   reserved "extern"
-  name <- identifier
-  args <- parens $ many identifier
-  return $ Extern name args
+  nm <- name
+  args <- parens $ many name
+  return $ Extern nm args
 
 call :: Parser Expr
 call = do
-  name <- identifier
+  nm <- name
   args <- parens $ commaSep expr
-  return $ Call name args
+  return $ Call nm args
 
 ifthen :: Parser Expr
 ifthen = do
@@ -74,7 +72,7 @@ ifthen = do
 for :: Parser Expr
 for = do
   reserved "for"
-  var <- identifier
+  var <- name
   reservedOp "="
   start <- expr
   reservedOp ","

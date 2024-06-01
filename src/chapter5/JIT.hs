@@ -2,29 +2,29 @@
 
 module JIT where
 
-
+import Data.Int
+import Data.Word
 import Foreign.Ptr ( FunPtr, castFunPtr )
-import Data.String ( IsString(fromString) )
+import Data.Maybe
 import qualified Data.ByteString.Char8 as BS
-import Control.Applicative ( Alternative((<|>)) )
+import Control.Monad.Except
+import Control.Applicative
 
-
-import LLVM.Context ( Context, withContext )
+import LLVM.Target
+import LLVM.Context
+import LLVM.CodeModel
 import LLVM.Module as Mod
-    ( moduleAST, moduleLLVMAssembly, withModuleFromAST )
 import qualified LLVM.AST as AST
 
 import LLVM.PassManager
-    ( PassSetSpec(optLevel),
-      defaultCuratedPassSetSpec,
-      runPassManager,
-      withPassManager )
-import LLVM.Analysis ( verify )
+import LLVM.Transforms
+import LLVM.Analysis
 
 import qualified LLVM.ExecutionEngine as EE
 import LLVM.Internal.Analysis (verify)
 import GHC.Generics (Generic1(from1))
 import LLVM.Internal.ExecutionEngine (ExecutableModule, ExecutionEngine)
+import LLVM.AST (mkName)
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> IO Double
 
@@ -54,9 +54,10 @@ runJIT mod = do
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
           BS.putStrLn s
+          putStrLn (show mod)
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
-            mainfn <- EE.getFunction ee (fromString "main")
+            mainfn <- EE.getFunction ee (mkName "main")
             mainfn_n <- getLastFunctionN ee "main"
             case mainfn_n <|> mainfn of
               Just fn -> do
@@ -81,7 +82,7 @@ gatherFunctions :: (ExecutionEngine e f) => ExecutableModule e -> String -> IO [
 gatherFunctions ee name = gatherFunctions' 1 []
   where
     -- gF :: Int -> IO (Maybe f)
-    gF i = EE.getFunction ee (fromString (genFName name i))
+    gF i = EE.getFunction ee (mkName (genFName name i))
     -- gFs :: IO [f]
     gatherFunctions' i fs = do
               fun <- gF i
