@@ -152,3 +152,55 @@ executable chapter7
     , parsec        >=3.1     && <3.2
     , transformers  >=0.3.0.0 && <0.6
     , bytestring
+
+test-suite chapter3-test
+  type: exitcode-stdio-1.0
+  main-is: Spec3.hs  
+  other-modules:
+    Codegen
+    Emit
+    Lexer
+    Parser
+    Syntax
+  hs-source-dirs:
+      test
+      src/chapter3
+  ghc-options: -threaded -rtsopts "-with-rtsopts=-N -qg"
+  build-depends:
+      base          >=4.7     && <5
+    , containers    >=0.4     && <0.7
+    , haskeline     >=0.7.1.2 && <0.9
+    , llvm-hs       >=9.0.0   && <10.0.0
+    , llvm-hs-pure  >=9.0.0   && <10.0.0
+    , mtl           >=2.1.3   && <2.3
+    , parsec        >=3.1     && <3.2
+    , transformers  >=0.3.0.0 && <0.6
+    , bytestring
+  default-language: Haskell2010
+
+
+test-suite chapter7-test
+  type: exitcode-stdio-1.0
+  main-is: Spec7.hs  
+  other-modules:
+    Codegen
+    Emit
+    Lexer
+    Parser
+    Syntax
+    JIT
+  hs-source-dirs:
+      test
+      src/chapter7
+  ghc-options: -threaded -rtsopts "-with-rtsopts=-N -qg"
+  build-depends:
+      base          >=4.7     && <5
+    , containers    >=0.4     && <0.7
+    , haskeline     >=0.7.1.2 && <0.9
+    , llvm-hs       >=9.0.0   && <10.0.0
+    , llvm-hs-pure  >=9.0.0   && <10.0.0
+    , mtl           >=2.1.3   && <2.3
+    , parsec        >=3.1     && <3.2
+    , transformers  >=0.3.0.0 && <0.6
+    , bytestring
+  default-language: Haskell2010
