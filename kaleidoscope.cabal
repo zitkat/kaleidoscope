@@ -176,6 +176,7 @@ test-suite chapter3-test
     , parsec        >=3.1     && <3.2
     , transformers  >=0.3.0.0 && <0.6
     , bytestring
+    , hspec
   default-language: Haskell2010
 
 
@@ -183,12 +184,13 @@ test-suite chapter7-test
   type: exitcode-stdio-1.0
   main-is: Spec7.hs  
   other-modules:
-    Codegen
-    Emit
-    Lexer
-    Parser
-    Syntax
-    JIT
+     SpecCommon
+     Codegen
+     Emit
+     Lexer
+     Parser
+     Syntax
+     JIT
   hs-source-dirs:
       test
       src/chapter7
@@ -203,4 +205,5 @@ test-suite chapter7-test
     , parsec        >=3.1     && <3.2
     , transformers  >=0.3.0.0 && <0.6
     , bytestring
+    , hspec
   default-language: Haskell2010
