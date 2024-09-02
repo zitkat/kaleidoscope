@@ -151,6 +151,14 @@ packShort = toShort . BS.pack
 unpackName :: AST.Name -> ShortByteString
 unpackName (AST.Name nm) = nm
 
+toAnon :: Expr -> Codegen Expr
+toAnon f@Function {}  = return f
+toAnon  e = do
+  lastAnonId <- gets nameSupply
+  let newAnonId = AST.UnName (lastAnonId + 1)
+  modify (\s -> s {nameSupply = (lastAnonId + 1)})
+  return (Function (prefixName "anon" newAnonId) [] e)
+
 getLastAnon :: Codegen (Maybe String)
 getLastAnon = do
   lastAnonId <- gets nameSupply
@@ -166,7 +174,7 @@ passes = LLPM.defaultCuratedPassSetSpec {LLPM.optLevel = Just 3}
 codegenModule :: [Expr] -> Codegen AST.Module
 codegenModule phrases = do
   modDefs <- gets modDefinitions
-  anonLabeledPhrases <- traverse return phrases
+  anonLabeledPhrases <- traverse toAnon phrases
   --liftIO (pPrint anonLabeledPhrases)
   defs <- IRB.execModuleBuilderT IRB.emptyModuleBuilder (mapM_ codegenDefn anonLabeledPhrases)
   let updatedDefs = modDefs ++ defs
