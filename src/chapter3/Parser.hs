@@ -17,6 +17,7 @@ import Lexer
       reservedOp )
 import Syntax
     ( Expr(Call, Float, BinaryOp, Var, Function, Extern) )
+import LLVM.AST (Name, mkName)
 
 int :: Parser Expr
 int = Float . fromInteger <$> integer
@@ -24,7 +25,10 @@ int = Float . fromInteger <$> integer
 floating :: Parser Expr
 floating = Float <$> float
 
-binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
+name :: Parser Name
+name = mkName <$> identifier
+
+binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp (mkName s))) assoc
 
 binops = [[binary "*" Ex.AssocLeft,
           binary "/" Ex.AssocLeft]
@@ -35,14 +39,14 @@ expr :: Parser Expr
 expr = Ex.buildExpressionParser binops factor
 
 variable :: Parser Expr
-variable = Var <$> identifier
+variable = Var <$> name
 
 function :: Parser Expr
 function =  do
   reserved "def"
-  name <- identifier
-  args <- parens $ many identifier 
-  Function name args <$> expr
+  nm <- name
+  args <- parens $ many name 
+  Function nm args <$> expr
 
 -- originally 
   -- do
@@ -55,15 +59,15 @@ function =  do
 extern :: Parser Expr
 extern = do
   reserved "extern"
-  name <- identifier
-  args <- parens $ many identifier 
-  return $ Extern name args
+  nm <- name
+  args <- parens $ many name 
+  return $ Extern nm args
 
 call :: Parser Expr
 call = do
-  name <- identifier
+  nm <- name
   args <- parens $ commaSep expr
-  return $ Call name args
+  return $ Call nm args
 
 factor :: Parser Expr
 factor = try floating
